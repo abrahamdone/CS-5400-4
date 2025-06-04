@@ -78,13 +78,14 @@ MySample.main = (function() {
         let uInteresting = gl.getUniformLocation(shaderProgram, 'uInteresting');
         gl.uniform1i(uInteresting, interesting ? 1 : 0);
 
-        // let projection = transposeMatrix4x4(perspective(1, 1, -1, -10));
-        let projection = [
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1
-        ];
+        let projection = parallelProjection(1, -1, 1, -1, 1, 10);
+        // let projection = perspectiveProjection(1, 1, -1, -5);
+        // let projection = [
+        //     1, 0, 0, 0,
+        //     0, 1, 0, 0,
+        //     0, 0, 1, 0,
+        //     0, 0, 0, 1
+        // ];
         let uProjection = gl.getUniformLocation(shaderProgram, 'uProjection');
         gl.uniformMatrix4fv(uProjection, false, projection);
 
@@ -108,8 +109,14 @@ MySample.main = (function() {
             -sin,    0,  cos,    0,
                0,    0,    0,    1
         ];
+        let move = [
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, -1,
+            0, 0, 0, 1
+        ];
         let uTransform = gl.getUniformLocation(shaderProgram, 'uTransform');
-        gl.uniformMatrix4fv(uTransform, false, transposeMatrix4x4(multiplyMatrix4x4(zRotation, multiplyMatrix4x4(xRotation, yRotation))));
+        gl.uniformMatrix4fv(uTransform, false, transposeMatrix4x4(multiplyMatrix4x4(move, multiplyMatrix4x4(zRotation, multiplyMatrix4x4(xRotation, yRotation)))));
 
         let scale = [
             size,    0,    0,    0,
@@ -322,7 +329,16 @@ MySample.main = (function() {
         gl.useProgram(shaderProgram);
     }
 
-    function perspective(right, top, near, far) {
+    function parallelProjection(right, left, top, bottom, near, far) {
+        return [
+            2 / (right - left),                    0,                  0,  -(right + left) / (right - left),
+            0,                    2 / (top - bottom),                  0,  -(top + bottom) / (top - bottom),
+            0,                                     0,  -2 / (far - near),      -(far + near) / (far - near),
+            0,                                     0,                  0,                                 1
+        ]
+    }
+
+    function perspectiveProjection(right, top, near, far) {
         return [
             near / right,                  0,                            0,                               0,
                        0,         near / top,                            0,                               0,
