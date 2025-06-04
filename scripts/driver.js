@@ -1,6 +1,5 @@
 
 // noinspection JSVoidFunctionReturnValueUsed
-
 MySample.main = (function() {
     'use strict';
 
@@ -14,12 +13,50 @@ MySample.main = (function() {
     let shaderProgram = {};
     let indexBuffer = {};
 
+    let rotateAngle = 0;
+
+    let step = 0;
+    let interesting = false;
+    let size = 0.288675;
+    let growing = true;
+
     //------------------------------------------------------------------
     //
     // Scene updates go here.
     //
     //------------------------------------------------------------------
     function update() {
+        if (step < 1000) {
+            initializeVertices(0);
+        } else if (step  < 2000) {
+            initializeVertices(1)
+        } else if (step < 3000) {
+            initializeVertices(2)
+        } else {
+            interesting = true;
+            initializeVertices(3)
+        }
+        step += 1;
+        if (rotateAngle > 2 * Math.PI) {
+            rotateAngle = 0;
+        }
+        rotateAngle += 0.01;
+
+        if (interesting) {
+            if (growing) {
+                if (size >= 1.0) {
+                    growing = false;
+                } else {
+                    size += 0.0005;
+                }
+            } else {
+                if (size <= 0.288675) {
+                    growing = true;
+                } else {
+                    size -= 0.0005;
+                }
+            }
+        }
     }
 
     //------------------------------------------------------------------
@@ -37,6 +74,51 @@ MySample.main = (function() {
         gl.depthFunc(gl.LEQUAL);
         gl.enable(gl.DEPTH_TEST);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        let uInteresting = gl.getUniformLocation(shaderProgram, 'uInteresting');
+        gl.uniform1i(uInteresting, interesting ? 1 : 0);
+
+        // let projection = transposeMatrix4x4(perspective(1, 1, -1, -10));
+        let projection = [
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        ];
+        let uProjection = gl.getUniformLocation(shaderProgram, 'uProjection');
+        gl.uniformMatrix4fv(uProjection, false, projection);
+
+        let cos = Math.cos(rotateAngle);
+        let sin = Math.sin(rotateAngle);
+        let zRotation = [
+            cos, -sin,    0,    0,
+            sin,  cos,    0,    0,
+              0,    0,    1,    0,
+              0,    0,    0,    1,
+        ];
+        let xRotation = [
+               1,    0,    0,    0,
+               0,  cos, -sin,    0,
+               0,  sin,  cos,    0,
+               0,    0,    0,    1
+        ];
+        let yRotation = [
+             cos,    0,  sin,    0,
+               0,    1,    0,    0,
+            -sin,    0,  cos,    0,
+               0,    0,    0,    1
+        ];
+        let uTransform = gl.getUniformLocation(shaderProgram, 'uTransform');
+        gl.uniformMatrix4fv(uTransform, false, transposeMatrix4x4(multiplyMatrix4x4(zRotation, multiplyMatrix4x4(xRotation, yRotation))));
+
+        let scale = [
+            size,    0,    0,    0,
+               0, size,    0,    0,
+               0,    0, size,    0,
+               0,    0,    0,    1,
+        ];
+        let uScale = gl.getUniformLocation(shaderProgram, 'uScale');
+        gl.uniformMatrix4fv(uScale, false, transposeMatrix4x4(scale));
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
         gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
@@ -62,24 +144,139 @@ MySample.main = (function() {
         const fragmentShaderSource = await loadFileFromServer('assets/shaders/simple.frag');
         initializeShaders(vertexShaderSource, fragmentShaderSource);
 
-        initializeVertices();
-        initializeBufferObjects();
-
         requestAnimationFrame(animationLoop);
     }
-    function initializeVertices() {
-        vertices = new Float32Array([
-            0.0, 0.5, 0.0,
-            0.5, -0.5, 0.0,
-            -0.5, -0.5, 0.0
-        ]);
-        indices = new Uint16Array([ 0, 2, 1 ]);
-        vertexColors = new Float32Array([
-            1.0, 0.0, 0.0,
-            0.0, 1.0, 0.0,
-            0.0, 0.0, 1.0
-        ]);
+
+    function initializeVertices(set) {
+        switch (set) {
+            case 0:
+                // octahedron
+                vertices = new Float32Array([
+                     0.5,  0.0,  0.0,
+                     0.0,  0.5,  0.0,
+                     0.0,  0.0,  0.5,
+                    -0.5,  0.0,  0.0,
+                     0.0, -0.5,  0.0,
+                     0.0,  0.0, -0.5
+                ]);
+                indices = new Uint16Array([
+                    0, 1, 2,
+                    0, 5, 1,
+                    0, 4, 5,
+                    0, 2, 4,
+                    3, 2, 1,
+                    3, 1, 5,
+                    3, 4, 2,
+                    3, 5, 4
+                ]);
+                vertexColors = new Float32Array([
+                    1.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0,
+                    0.0, 0.0, 1.0,
+                    1.0, 1.0, 0.0,
+                    0.0, 1.0, 1.0,
+                    1.0, 0.0, 1.0
+                ]);
+                break;
+            case 1:
+                // cube
+                vertices = new Float32Array([
+                     0.5,  0.5,  0.5,
+                     0.5, -0.5, -0.5,
+                    -0.5,  0.5, -0.5,
+                    -0.5, -0.5,  0.5,
+                     0.5, -0.5,  0.5,
+                     0.5,  0.5, -0.5,
+                    -0.5,  0.5,  0.5,
+                    -0.5, -0.5, -0.5
+                ]);
+                indices = new Uint16Array([
+                    0, 3, 4,
+                    0, 4, 1,
+                    1, 4, 3,
+                    0, 6, 3,
+                    0, 2, 6,
+                    6, 2, 3,
+                    0, 5, 2,
+                    0, 1, 5,
+                    5, 1, 2,
+                    7, 1, 3,
+                    7, 2, 1,
+                    7, 3, 2
+                ]);
+                vertexColors = new Float32Array([
+                      1.0, 0.0, 0.0,
+                      0.0, 1.0, 0.0,
+                      0.0, 0.0, 1.0,
+                      0.0, 0.0, 0.0,
+                      1.0, 1.0, 0.0,
+                      1.0, 0.0, 1.0,
+                      0.0, 1.0, 1.0,
+                      1.0, 1.0, 1.0
+                ]);
+                break;
+            case 2:
+                // tetrahedron
+                vertices = new Float32Array([
+                     0.5,  0.5,  0.5,
+                     0.5, -0.5, -0.5,
+                    -0.5,  0.5, -0.5,
+                    -0.5, -0.5,  0.5
+                ]);
+                indices = new Uint16Array([
+                    0, 1, 2,
+                    0, 2, 3,
+                    1, 3, 2,
+                    0, 3, 1
+                ]);
+                vertexColors = new Float32Array([
+                    1.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0,
+                    0.0, 0.0, 1.0,
+                    0.0, 0.0, 0.0,
+                ]);
+                break;
+            case 3:
+                // special cube
+                vertices = new Float32Array([
+                     0.5,  0.5,  0.5,
+                     0.5, -0.5, -0.5,
+                    -0.5,  0.5, -0.5,
+                    -0.5, -0.5,  0.5,
+                     0.5, -0.5,  0.5,
+                     0.5,  0.5, -0.5,
+                    -0.5,  0.5,  0.5,
+                    -0.5, -0.5, -0.5
+                ]);
+                indices = new Uint16Array([
+                    0, 3, 4,
+                    0, 4, 1,
+                    1, 4, 3,
+                    0, 6, 3,
+                    0, 2, 6,
+                    6, 2, 3,
+                    0, 5, 2,
+                    0, 1, 5,
+                    5, 1, 2,
+                    7, 1, 3,
+                    7, 2, 1,
+                    7, 3, 2
+                ]);
+                vertexColors = new Float32Array([
+                      1.0,   0.0,   0.0,
+                      0.0,   1.0,   0.0,
+                      0.0,   0.0,   1.0,
+                      0.0,   0.0,   0.0,
+                    0.333, 0.333,   0.0,
+                    0.333, 0.333, 0.333,
+                    0.333,   0.0, 0.333,
+                      0.0, 0.333, 0.333
+                ]);
+                break;
+        }
+        initializeBufferObjects();
     }
+
     function initializeBufferObjects() {
         let vertexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
@@ -101,6 +298,7 @@ MySample.main = (function() {
         gl.enableVertexAttribArray(position);
         gl.vertexAttribPointer(position, 3, gl.FLOAT, false, vertices.BYTES_PER_ELEMENT * 3, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
+
         let color = gl.getAttribLocation(shaderProgram, 'aColor');
         gl.enableVertexAttribArray(color);
         gl.vertexAttribPointer(color, 3, gl.FLOAT, false, vertexColors.BYTES_PER_ELEMENT * 3, 0);
@@ -122,6 +320,15 @@ MySample.main = (function() {
         gl.attachShader(shaderProgram, fragmentShader);
         gl.linkProgram(shaderProgram);
         gl.useProgram(shaderProgram);
+    }
+
+    function perspective(right, top, near, far) {
+        return [
+            near / right,                  0,                            0,                               0,
+                       0,         near / top,                            0,                               0,
+                       0,                  0, -(far + near) / (far - near),  -2 * far * near / (far - near),
+                       0,                  0,                           -1,                               0
+        ]
     }
 
     initialize();
