@@ -19,9 +19,14 @@ MySample.main = (function() {
 
     let step = 0;
     let interesting = false;
-    let size = 0.288675;
+    let vertexSize = 0.288675;
+    let size = 1;
+    let position = 0;
     let growing = true;
     let parallel = true;
+    let durationMultiplier = 500;
+
+    let transformation = {};
 
     //------------------------------------------------------------------
     //
@@ -35,18 +40,23 @@ MySample.main = (function() {
             projection = perspectiveProjection(1, 1, 1, 10);
         }
 
-        if (step < 1000) {
+        transformation = multiplyMatrix4x4(moveMatrix(0, 0, -2), multiplyMatrix4x4(rotateXZ(0, 0, 0, rotateAngle), rotateXY(0, 0, 0, rotateAngle)));
+        if (step < 1 * durationMultiplier) {
             initializeVertices(0);
-        } else if (step  < 2000) {
+        } else if (step  < 2 * durationMultiplier) {
             initializeVertices(1)
-        } else if (step < 3000) {
+        } else if (step < 3 * durationMultiplier) {
             initializeVertices(2)
-        } else if (step < 10000) {
+        } else if (step < 10 * durationMultiplier) {
+            transformation = multiplyMatrix4x4(scaleMatrix(0, 0, 0, size, size, size), transformation);
+            transformation = multiplyMatrix4x4(moveMatrix(0, position, -position), transformation);
             interesting = true;
             initializeVertices(3)
         } else {
+            size = 1;
+            position = 0;
             growing = false;
-            size = 0.288675;
+            vertexSize = 0.288675;
             interesting = false;
             step = 0;
             parallel = !parallel;
@@ -56,20 +66,24 @@ MySample.main = (function() {
         if (rotateAngle > 2 * Math.PI) {
             rotateAngle = 0;
         }
-        rotateAngle += 0.01;
+        rotateAngle += 360 / (100 * durationMultiplier);
 
         if (interesting) {
             if (growing) {
-                if (size >= 1.0) {
+                if (vertexSize >= 1.0) {
                     growing = false;
                 } else {
-                    size += 0.0005;
+                    position += 0.2 / durationMultiplier;
+                    size -= 0.2 / durationMultiplier;
+                    vertexSize += 0.5 / durationMultiplier;
                 }
             } else {
-                if (size <= 0.288675) {
+                if (vertexSize <= 0.288675) {
                     growing = true;
                 } else {
-                    size -= 0.0005;
+                    position -= 0.2 / durationMultiplier;
+                    size += 0.2 / durationMultiplier;
+                    vertexSize -= 0.5 / durationMultiplier;
                 }
             }
         }
@@ -97,43 +111,17 @@ MySample.main = (function() {
         let uProjection = gl.getUniformLocation(shaderProgram, 'uProjection');
         gl.uniformMatrix4fv(uProjection, false, transposeMatrix4x4(projection));
 
-        let cos = Math.cos(rotateAngle);
-        let sin = Math.sin(rotateAngle);
-        let zRotation = [
-            cos, -sin,    0,    0,
-            sin,  cos,    0,    0,
-              0,    0,    1,    0,
-              0,    0,    0,    1,
-        ];
-        let xRotation = [
-               1,    0,    0,    0,
-               0,  cos, -sin,    0,
-               0,  sin,  cos,    0,
-               0,    0,    0,    1
-        ];
-        let yRotation = [
-             cos,    0,  sin,    0,
-               0,    1,    0,    0,
-            -sin,    0,  cos,    0,
-               0,    0,    0,    1
-        ];
-        let move = [
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, -2,
-            0, 0, 0, 1
-        ];
         let uTransform = gl.getUniformLocation(shaderProgram, 'uTransform');
-        gl.uniformMatrix4fv(uTransform, false, transposeMatrix4x4(multiplyMatrix4x4(move, multiplyMatrix4x4(zRotation, multiplyMatrix4x4(xRotation, yRotation)))));
+        gl.uniformMatrix4fv(uTransform, false, transposeMatrix4x4(transformation));
 
-        let scale = [
-            size,    0,    0,    0,
-               0, size,    0,    0,
-               0,    0, size,    0,
+        let interestingScale = [
+            vertexSize,    0,    0,    0,
+               0, vertexSize,    0,    0,
+               0,    0, vertexSize,    0,
                0,    0,    0,    1,
         ];
         let uScale = gl.getUniformLocation(shaderProgram, 'uScale');
-        gl.uniformMatrix4fv(uScale, false, transposeMatrix4x4(scale));
+        gl.uniformMatrix4fv(uScale, false, transposeMatrix4x4(interestingScale));
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
         gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
@@ -353,6 +341,57 @@ MySample.main = (function() {
                        0,                  0, -(far + near) / (far - near),  -2 * far * near / (far - near),
                        0,                  0,                           -1,                               0
         ]
+    }
+
+    function moveMatrix(x, y, z) {
+        return [
+            1, 0, 0, x,
+            0, 1, 0, y,
+            0, 0, 1, z,
+            0, 0, 0, 1
+        ]
+    }
+
+    function rotateXY(x, y, z, angle) {
+        let cos = Math.cos(rotateAngle);
+        let sin = Math.sin(rotateAngle);
+        return multiplyMatrix4x4(moveMatrix(-x, -y, -z), multiplyMatrix4x4([
+            cos, -sin,    0,    0,
+            sin,  cos,    0,    0,
+              0,    0,    1,    0,
+              0,    0,    0,    1,
+        ], moveMatrix(x, y, z)));
+    }
+
+    function rotateXZ(x, y, z, angle) {
+        let cos = Math.cos(rotateAngle);
+        let sin = Math.sin(rotateAngle);
+        return multiplyMatrix4x4(moveMatrix(-x, -y, -z), multiplyMatrix4x4([
+             cos,    0,  sin,    0,
+               0,    1,    0,    0,
+            -sin,    0,  cos,    0,
+               0,    0,    0,    1
+        ], moveMatrix(x, y, z)));
+    }
+
+    function rotateYZ(x, y, z, angle) {
+        let cos = Math.cos(rotateAngle);
+        let sin = Math.sin(rotateAngle);
+        return multiplyMatrix4x4(moveMatrix(-x, -y, -z), multiplyMatrix4x4([
+            1,    0,    0,    0,
+            0,  cos, -sin,    0,
+            0,  sin,  cos,    0,
+            0,    0,    0,    1
+        ], moveMatrix(x, y, z)));
+    }
+
+    function scaleMatrix(x, y, z, sizeX, sizeY, sizeZ) {
+        return multiplyMatrix4x4(moveMatrix(-x, -y, -z), multiplyMatrix4x4([
+            sizeX,     0,         0,     0,
+                0, sizeY,         0,     0,
+                0,     0,     sizeZ,     0,
+                0,     0,         0,     1
+        ], moveMatrix(x, y, z)));
     }
 
     initialize();
