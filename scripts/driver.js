@@ -13,12 +13,15 @@ MySample.main = (function() {
     let shaderProgram = {};
     let indexBuffer = {};
 
+    let projection = {};
+
     let rotateAngle = 0;
 
     let step = 0;
     let interesting = false;
     let size = 0.288675;
     let growing = true;
+    let parallel = true;
 
     //------------------------------------------------------------------
     //
@@ -26,16 +29,29 @@ MySample.main = (function() {
     //
     //------------------------------------------------------------------
     function update() {
+        if (parallel) {
+            projection = parallelProjection(1, -1, 1, -1, 1, 10);
+        } else {
+            projection = perspectiveProjection(1, 1, 1, 10);
+        }
+
         if (step < 1000) {
             initializeVertices(0);
         } else if (step  < 2000) {
             initializeVertices(1)
         } else if (step < 3000) {
             initializeVertices(2)
-        } else {
+        } else if (step < 10000) {
             interesting = true;
             initializeVertices(3)
+        } else {
+            growing = false;
+            size = 0.288675;
+            interesting = false;
+            step = 0;
+            parallel = !parallel;
         }
+
         step += 1;
         if (rotateAngle > 2 * Math.PI) {
             rotateAngle = 0;
@@ -78,16 +94,8 @@ MySample.main = (function() {
         let uInteresting = gl.getUniformLocation(shaderProgram, 'uInteresting');
         gl.uniform1i(uInteresting, interesting ? 1 : 0);
 
-        let projection = parallelProjection(1, -1, 1, -1, 1, 10);
-        // let projection = perspectiveProjection(1, 1, -1, -5);
-        // let projection = [
-        //     1, 0, 0, 0,
-        //     0, 1, 0, 0,
-        //     0, 0, 1, 0,
-        //     0, 0, 0, 1
-        // ];
         let uProjection = gl.getUniformLocation(shaderProgram, 'uProjection');
-        gl.uniformMatrix4fv(uProjection, false, projection);
+        gl.uniformMatrix4fv(uProjection, false, transposeMatrix4x4(projection));
 
         let cos = Math.cos(rotateAngle);
         let sin = Math.sin(rotateAngle);
@@ -112,7 +120,7 @@ MySample.main = (function() {
         let move = [
             1, 0, 0, 0,
             0, 1, 0, 0,
-            0, 0, 1, -1,
+            0, 0, 1, -2,
             0, 0, 0, 1
         ];
         let uTransform = gl.getUniformLocation(shaderProgram, 'uTransform');
